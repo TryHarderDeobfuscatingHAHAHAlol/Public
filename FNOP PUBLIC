@@ -257,7 +257,7 @@ end, "Speed up all tools")
 local farmTab = window:AddTab("Farming")
 farmTab:Addlabel("Rebirths")
 
-farmTab:AddTextBox("Target Rebirth Amount", function(text)
+farming:AddTextBox("Target Rebirth Amount", function(text)
     local newValue = tonumber(text)
     if newValue and newValue > 0 then
         targetRebirthValue = newValue
@@ -279,7 +279,7 @@ end)
 
 local infiniteSwitch
 
-local targetSwitch = farmTab:AddSwitch("Auto Rebirth Target", function(bool)
+local targetSwitch = farming:AddSwitch("Auto Rebirth Target", function(bool)
     _G.targetRebirthActive = bool
     
     if bool then
@@ -311,7 +311,7 @@ local targetSwitch = farmTab:AddSwitch("Auto Rebirth Target", function(bool)
     end
 end, "automatic rebirth until reaching the goal")
 
-local weightSwitch = farmTab:AddSwitch("Auto Weight", function(Value)
+local weightSwitch = farming:AddSwitch("Auto Weight", function(Value)
     _G.AutoWeight = Value
     
     if Value then
@@ -336,7 +336,7 @@ local weightSwitch = farmTab:AddSwitch("Auto Weight", function(Value)
     end)
 end, "Auto Weight")
 
-local sizeSwitch = farmTab:AddSwitch("Auto Size 2", function(bool)
+local sizeSwitch = farming:AddSwitch("Auto Size 2", function(bool)
     _G.autoSizeActive = bool
     
     if bool then
@@ -348,7 +348,7 @@ local sizeSwitch = farmTab:AddSwitch("Auto Size 2", function(bool)
     end
 end, "Size 2")
 
-local teleportSwitch = farmTab:AddSwitch("Auto Teleport to Muscle King", function(bool)
+local teleportSwitch = farming:AddSwitch("Auto Teleport to Muscle King", function(bool)
     _G.teleportActive = bool
     
     if bool then
