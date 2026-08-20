@@ -620,7 +620,7 @@ local ancientJungleRockSwitch = farming:AddSwitch("Jungle Rock", function(bool)
     end
 end)
 
-farming:Addlabel("OP FARMING:")
+farming:AddLabel("OP FARMING:")
 
 local farmingConfigs = {
 	{name = "Auto Pushups + Jungle rock", tool = "Pushups", rock = "Ancient Jungle Rock"},
@@ -630,33 +630,49 @@ local farmingConfigs = {
 
 for _, config in ipairs(farmingConfigs) do
 	local isActive = false
+	
 	farming:AddSwitch(config.name, function(state)
 		isActive = state
+		
 		if isActive then
-			if PlayerData.Player.Backpack:FindFirstChild(config.tool) and not PlayerData.Player.Character:FindFirstChild(config.tool) then
-				PlayerData.Player.Character.Humanoid:EquipTool(PlayerData.Player.Backpack[config.tool])
-			end
 			task.spawn(function()
 				while isActive do
-					PlayerData.Player.muscleEvent:FireServer("rep")
-					if Services.Workspace.machinesFolder:FindFirstChild(config.rock) and PlayerData.Player.Character:FindFirstChild("LeftHand") then
-						firetouchinterest(Services.Workspace.machinesFolder[config.rock].Rock, PlayerData.Player.Character.LeftHand, 0)
-						firetouchinterest(Services.Workspace.machinesFolder[config.rock].Rock, PlayerData.Player.Character.LeftHand, 1)
+					local char = PlayerData.Player.Character
+					local bp = PlayerData.Player.Backpack
+					
+					if char and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
+						-- Equip Main Tool kung nasa Backpack pa
+						if bp:FindFirstChild(config.tool) then
+							char.Humanoid:EquipTool(bp[config.tool])
+						end
+						
+						-- Fire muscle event
+						if PlayerData.Player:FindFirstChild("muscleEvent") then
+							PlayerData.Player.muscleEvent:FireServer("rep")
+						end
+						
+						-- Touch Rock
+						local rockObj = Services.Workspace.machinesFolder:FindFirstChild(config.rock)
+						if rockObj and rockObj:FindFirstChild("Rock") and char:FindFirstChild("LeftHand") then
+							firetouchinterest(rockObj.Rock, char.LeftHand, 0)
+							firetouchinterest(rockObj.Rock, char.LeftHand, 1)
+						end
+						
+						-- Auto Punch
+						if bp:FindFirstChild("Punch") or char:FindFirstChild("Punch") then
+							PlayerData.Player.muscleEvent:FireServer("punch", "rightHand")
+							PlayerData.Player.muscleEvent:FireServer("punch", "leftHand")
+						end
 					end
-					if PlayerData.Player.Backpack:FindFirstChild("Punch") then
-						PlayerData.Player.Character.Humanoid:EquipTool(PlayerData.Player.Backpack.Punch)
-						PlayerData.Player.muscleEvent:FireServer("punch", "rightHand")
-						PlayerData.Player.muscleEvent:FireServer("punch", "leftHand")
-					end
-					Services.RunService.RenderStepped:Wait()
-					if PlayerData.Player.Backpack:FindFirstChild(config.tool) then
-						PlayerData.Player.Character.Humanoid:EquipTool(PlayerData.Player.Backpack[config.tool])
-					end
+					
+					-- Maglagay ng kaunting delay para hindi ma-kick sa spam (0.05-0.1s)
+					task.wait(0.05)
 				end
 			end)
 		else
-			if PlayerData.Player.Character:FindFirstChild(config.tool) then
-				PlayerData.Player.Character[config.tool].Parent = PlayerData.Player.Backpack
+			local char = PlayerData.Player.Character
+			if char and char:FindFirstChild(config.tool) then
+				char[config.tool].Parent = PlayerData.Player.Backpack
 			end
 		end
 	end)
