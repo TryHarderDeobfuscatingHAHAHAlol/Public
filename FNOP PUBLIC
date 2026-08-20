@@ -630,7 +630,7 @@ local farmingConfigs = {
 
 for _, config in ipairs(farmingConfigs) do
 	local isActive = false
-	Tabs.Farming:AddSwitch(config.name, function(state)
+	farming:AddSwitch(config.name, function(state)
 		isActive = state
 		if isActive then
 			if PlayerData.Player.Backpack:FindFirstChild(config.tool) and not PlayerData.Player.Character:FindFirstChild(config.tool) then
