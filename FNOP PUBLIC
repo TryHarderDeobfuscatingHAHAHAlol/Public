@@ -254,32 +254,34 @@ folder:AddSwitch("Fast Tools", function(Value)
     end
 end, "Speed up all tools")
 
-local farmingTab = window:AddTab("Farming")
-farmingTab:Addlabel("Rebirths")
+local farming = window:AddTab("FARMING")
+farming:AddLabel("REBIRTH:")
+
+local targetRebirthValue = 0
 
 farming:AddTextBox("Target Rebirth Amount", function(text)
     local newValue = tonumber(text)
     if newValue and newValue > 0 then
         targetRebirthValue = newValue
-        updateStats() -- Call the stats update function
+        if updateStats then updateStats() end
         
         game:GetService("StarterGui"):SetCore("SendNotification", {
             Title = "Objetivo Actualizado",
             Text = "Nuevo objetivo: " .. tostring(targetRebirthValue) .. " renacimientos",
-            Duration = 0
+            Duration = 3
         })
     else
         game:GetService("StarterGui"):SetCore("SendNotification", {
             Title = "Size",
             Text = "Put a size larger than 0",
-            Duration = 0
+            Duration = 3
         })
     end
 end)
 
 local infiniteSwitch
 
-local targetSwitch = farming:AddSwitch("Auto Rebirth Target", function(bool)
+local targetSwitch = farming:AddSwitch("Enable Target Rebirth", function(bool)
     _G.targetRebirthActive = bool
     
     if bool then
@@ -288,8 +290,8 @@ local targetSwitch = farming:AddSwitch("Auto Rebirth Target", function(bool)
             _G.infiniteRebirthActive = false
         end
         
-        spawn(function()
-            while _G.targetRebirthActive and wait(0.1) do
+        task.spawn(function()
+            while _G.targetRebirthActive do
                 local currentRebirths = game.Players.LocalPlayer.leaderstats.Rebirths.Value
                 
                 if currentRebirths >= targetRebirthValue then
@@ -297,15 +299,15 @@ local targetSwitch = farming:AddSwitch("Auto Rebirth Target", function(bool)
                     _G.targetRebirthActive = false
                     
                     game:GetService("StarterGui"):SetCore("SendNotification", {
-                        Title = "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡Objetivo Alcanzado!",
+                        Title = "Objetivo Alcanzado!",
                         Text = "Has alcanzado " .. tostring(targetRebirthValue) .. " renacimientos",
                         Duration = 5
                     })
-                    
                     break
                 end
                 
                 game:GetService("ReplicatedStorage").rEvents.rebirthRemote:InvokeServer("rebirthRequest")
+                task.wait(0.1)
             end
         end)
     end
@@ -321,7 +323,7 @@ local weightSwitch = farming:AddSwitch("Auto Weight", function(Value)
         end
     else
         local character = game.Players.LocalPlayer.Character
-        local equipped = character:FindFirstChild("Weight")
+        local equipped = character and character:FindFirstChild("Weight")
         if equipped then
             equipped.Parent = game.Players.LocalPlayer.Backpack
         end
@@ -329,34 +331,35 @@ local weightSwitch = farming:AddSwitch("Auto Weight", function(Value)
     
     task.spawn(function()
         while _G.AutoWeight do
-            if not _G.AutoWeight then break end
             game:GetService("Players").LocalPlayer.muscleEvent:FireServer("rep")
             task.wait(0.1)
         end
     end)
 end, "Auto Weight")
 
-local sizeSwitch = farming:AddSwitch("Auto Size 2", function(bool)
+local sizeSwitch = farming:AddSwitch("Auto Size 1", function(bool)
     _G.autoSizeActive = bool
     
     if bool then
-        spawn(function()
-            while _G.autoSizeActive and wait() do
-                game:GetService("ReplicatedStorage").rEvents.changeSpeedSizeRemote:InvokeServer("changeSize", 2)
+        task.spawn(function()
+            while _G.autoSizeActive do
+                game:GetService("ReplicatedStorage").rEvents.changeSpeedSizeRemote:InvokeServer("changeSize", 1)
+                task.wait(0.1)
             end
         end)
     end
-end, "Size 2")
+end, "Size 1")
 
-local teleportSwitch = farming:AddSwitch("Auto Teleport to Muscle King", function(bool)
+local teleportSwitch = farming:AddSwitch("Auto King", function(bool)
     _G.teleportActive = bool
     
     if bool then
-        spawn(function()
-            while _G.teleportActive and wait() do
+        task.spawn(function()
+            while _G.teleportActive do
                 if game.Players.LocalPlayer.Character then
                     game.Players.LocalPlayer.Character:MoveTo(Vector3.new(-8646, 17, -5738))
                 end
+                task.wait(0.1)
             end
         end)
     end
