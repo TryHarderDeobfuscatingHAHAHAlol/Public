@@ -254,8 +254,8 @@ folder:AddSwitch("Fast Tools", function(Value)
     end
 end, "Speed up all tools")
 
-local farmTab = window:AddTab("Farming")
-farmTab:Addlabel("Rebirths")
+local farmingTab = window:AddTab("Farming")
+farmingTab:Addlabel("Rebirths")
 
 farming:AddTextBox("Target Rebirth Amount", function(text)
     local newValue = tonumber(text)
