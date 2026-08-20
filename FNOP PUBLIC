@@ -1298,7 +1298,7 @@ SpectateData.LocalPlayerRespawnConnection = Services.Players.LocalPlayer.Charact
 	end
 end)
 
-killing:AddLabel("â­• Kill Aura:")
+killing:AddLabel("Kill Aura:")
 
 local KillAura = {RingPart = nil, RingColor = Color3.fromRGB(50, 163, 255), RingTransparency = 0.6}
 _G.showDeathRing = false
@@ -1356,7 +1356,7 @@ killing:AddSwitch("Toggle Ring", function(bool)
 	end
 end)
 
-local whitelistLabel = Tabs.Killing:AddLabel("Whitelist: None")
+local whitelistLabel = killing:AddLabel("Whitelist: None")
 whitelistLabel.TextSize = 14
 killing:AddButton("Clear Whitelist", function() _G.whitelistedPlayers = {} end)
 
