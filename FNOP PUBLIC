@@ -629,50 +629,60 @@ local farmingConfigs = {
 }
 
 for _, config in ipairs(farmingConfigs) do
-	local isActive = false
+	-- Ginawang table para masigurong laging na-uupdate ang state bawat switch
+	local switchState = { isActive = false }
 	
 	farming:AddSwitch(config.name, function(state)
-		isActive = state
+		switchState.isActive = state
 		
-		if isActive then
+		if switchState.isActive then
 			task.spawn(function()
-				while isActive do
-					local char = PlayerData.Player.Character
-					local bp = PlayerData.Player.Backpack
+				while switchState.isActive do
+					local player = PlayerData.Player
+					local char = player.Character
+					local bp = player.Backpack
 					
 					if char and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
-						-- Equip Main Tool kung nasa Backpack pa
-						if bp:FindFirstChild(config.tool) then
+						-- Equip Main Tool kung wala pa sa kamay
+						if not char:FindFirstChild(config.tool) and bp:FindFirstChild(config.tool) then
 							char.Humanoid:EquipTool(bp[config.tool])
 						end
 						
-						-- Fire muscle event
-						if PlayerData.Player:FindFirstChild("muscleEvent") then
-							PlayerData.Player.muscleEvent:FireServer("rep")
+						-- Fire muscle event para sa reps
+						local muscleEvent = player:FindFirstChild("muscleEvent")
+						if muscleEvent then
+							muscleEvent:FireServer("rep")
 						end
 						
 						-- Touch Rock
-						local rockObj = Services.Workspace.machinesFolder:FindFirstChild(config.rock)
-						if rockObj and rockObj:FindFirstChild("Rock") and char:FindFirstChild("LeftHand") then
-							firetouchinterest(rockObj.Rock, char.LeftHand, 0)
-							firetouchinterest(rockObj.Rock, char.LeftHand, 1)
+						local machinesFolder = Services.Workspace:FindFirstChild("machinesFolder")
+						local rockObj = machinesFolder and machinesFolder:FindFirstChild(config.rock)
+						local leftHand = char:FindFirstChild("LeftHand")
+						
+						if rockObj and rockObj:FindFirstChild("Rock") and leftHand then
+							pcall(function()
+								firetouchinterest(rockObj.Rock, leftHand, 0)
+								firetouchinterest(rockObj.Rock, leftHand, 1)
+							end)
 						end
 						
 						-- Auto Punch
-						if bp:FindFirstChild("Punch") or char:FindFirstChild("Punch") then
-							PlayerData.Player.muscleEvent:FireServer("punch", "rightHand")
-							PlayerData.Player.muscleEvent:FireServer("punch", "leftHand")
+						if muscleEvent and (bp:FindFirstChild("Punch") or char:FindFirstChild("Punch")) then
+							muscleEvent:FireServer("punch", "rightHand")
+							muscleEvent:FireServer("punch", "leftHand")
 						end
 					end
 					
-					-- Maglagay ng kaunting delay para hindi ma-kick sa spam (0.05-0.1s)
+					-- Delay para iwas anti-cheat / kick
 					task.wait(0.05)
 				end
 			end)
 		else
+			-- Ibalik sa backpack ang tool kapag pinatay ang switch
 			local char = PlayerData.Player.Character
-			if char and char:FindFirstChild(config.tool) then
-				char[config.tool].Parent = PlayerData.Player.Backpack
+			local toolObj = char and char:FindFirstChild(config.tool)
+			if toolObj then
+				toolObj.Parent = PlayerData.Player.Backpack
 			end
 		end
 	end)
