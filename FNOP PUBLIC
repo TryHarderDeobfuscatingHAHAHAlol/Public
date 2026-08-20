@@ -620,70 +620,754 @@ local ancientJungleRockSwitch = farming:AddSwitch("Jungle Rock", function(bool)
     end
 end)
 
-farming:AddLabel("OP FARMING:")
+local function checkCharacter()
+	if not Services.Players.LocalPlayer.Character then
+		repeat task.wait() until Services.Players.LocalPlayer.Character
+	end
+	return Services.Players.LocalPlayer.Character
+end
 
-local farmingConfigs = {
-	{name = "Auto Pushups + Jungle rock", tool = "Pushups", rock = "Ancient Jungle Rock"},
-	{name = "Auto Handstand + Jungle rock", tool = "Handstand", rock = "Ancient Jungle Rock"},
-	{name = "Auto Situps + jungle rock", tool = "Situps", rock = "Ancient Jungle Rock"}
-}
+local function gettool()
+	for _, v in pairs(Services.Players.LocalPlayer.Backpack:GetChildren()) do
+		if v.Name == "Punch" and Services.Players.LocalPlayer.Character:FindFirstChild("Humanoid") then
+			Services.Players.LocalPlayer.Character.Humanoid:EquipTool(v)
+		end
+	end
+	Services.Players.LocalPlayer.muscleEvent:FireServer("punch", "leftHand")
+	Services.Players.LocalPlayer.muscleEvent:FireServer("punch", "rightHand")
+end
 
-for _, config in ipairs(farmingConfigs) do
-	-- Ginawang table para masigurong laging na-uupdate ang state bawat switch
-	local switchState = { isActive = false }
-	
-	farming:AddSwitch(config.name, function(state)
-		switchState.isActive = state
-		
-		if switchState.isActive then
-			task.spawn(function()
-				while switchState.isActive do
-					local player = PlayerData.Player
-					local char = player.Character
-					local bp = player.Backpack
-					
-					if char and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
-						-- Equip Main Tool kung wala pa sa kamay
-						if not char:FindFirstChild(config.tool) and bp:FindFirstChild(config.tool) then
-							char.Humanoid:EquipTool(bp[config.tool])
-						end
-						
-						-- Fire muscle event para sa reps
-						local muscleEvent = player:FindFirstChild("muscleEvent")
-						if muscleEvent then
-							muscleEvent:FireServer("rep")
-						end
-						
-						-- Touch Rock
-						local machinesFolder = Services.Workspace:FindFirstChild("machinesFolder")
-						local rockObj = machinesFolder and machinesFolder:FindFirstChild(config.rock)
-						local leftHand = char:FindFirstChild("LeftHand")
-						
-						if rockObj and rockObj:FindFirstChild("Rock") and leftHand then
-							pcall(function()
-								firetouchinterest(rockObj.Rock, leftHand, 0)
-								firetouchinterest(rockObj.Rock, leftHand, 1)
-							end)
-						end
-						
-						-- Auto Punch
-						if muscleEvent and (bp:FindFirstChild("Punch") or char:FindFirstChild("Punch")) then
-							muscleEvent:FireServer("punch", "rightHand")
-							muscleEvent:FireServer("punch", "leftHand")
-						end
+local function isPlayerAlive(player)
+	return player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and 
+		player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0
+end
+
+local function killPlayer(target)
+	if not isPlayerAlive(target) or not checkCharacter():FindFirstChild("LeftHand") then return end
+	pcall(function()
+		firetouchinterest(target.Character.HumanoidRootPart, checkCharacter().LeftHand, 0)
+		firetouchinterest(target.Character.HumanoidRootPart, checkCharacter().LeftHand, 1)
+		gettool()
+	end)
+end
+
+local killing = window:AddTab("Killing")
+killing:AddLabel("Misc:")
+
+local statPetDropdown = killing:AddDropdown("Stat Pet Equip", function(text)
+	for _, folder in pairs(Services.Players.LocalPlayer.petsFolder:GetChildren()) do
+		if folder:IsA("Folder") then
+			for _, pet in pairs(folder:GetChildren()) do
+				Services.ReplicatedStorage.rEvents.equipPetEvent:FireServer("unequipPet", pet)
+			end
+		end
+	end
+	task.wait(0.2)
+	local petsToEquip = {}
+	for _, pet in pairs(Services.Players.LocalPlayer.petsFolder.Unique:GetChildren()) do
+		if pet.Name == text then table.insert(petsToEquip, pet) end
+	end
+	for i = 1, math.min(8, #petsToEquip) do
+		Services.ReplicatedStorage.rEvents.equipPetEvent:FireServer("equipPet", petsToEquip[i])
+		task.wait(0.1)
+	end
+end)
+for _, petName in ipairs({"Wild Wizard", "Mighty Monster", "Chaos Sorcerer", "Small Fry"}) do
+	statPetDropdown:Add(petName)
+end
+killing:AddSwitch("Remove Attack Animations", function(bool)
+	if bool then
+		local blockedAnimations = {
+			["rbxassetid://3638729053"] = true,
+			["rbxassetid://3638767427"] = true,
+		}
+
+		local function setupAnimationBlocking()
+			local char = Services.Players.LocalPlayer.Character
+			if not char or not char:FindFirstChild("Humanoid") then
+				return
+			end
+
+			for _, track in pairs(PlayerData.Humanoid:GetPlayingAnimationTracks()) do
+				if track.Animation then
+					local animId = track.Animation.AnimationId
+					local animName = track.Name:lower()
+
+					if
+						blockedAnimations[animId]
+						or animName:match("punch")
+						or animName:match("attack")
+						or animName:match("right")
+					then
+						track:Stop()
 					end
-					
-					-- Delay para iwas anti-cheat / kick
-					task.wait(0.05)
+				end
+			end
+
+			_G.AnimBlockConnection = PlayerData.Humanoid.AnimationPlayed:Connect(function(track)
+				if track.Animation then
+					local animId = track.Animation.AnimationId
+					local animName = track.Name:lower()
+
+					if
+						blockedAnimations[animId]
+						or animName:match("punch")
+						or animName:match("attack")
+						or animName:match("right")
+					then
+						track:Stop()
+					end
 				end
 			end)
-		else
-			-- Ibalik sa backpack ang tool kapag pinatay ang switch
-			local char = PlayerData.Player.Character
-			local toolObj = char and char:FindFirstChild(config.tool)
-			if toolObj then
-				toolObj.Parent = PlayerData.Player.Backpack
+		end
+
+		local function processTool(tool)
+			if tool and (tool.Name == "Punch" or tool.Name:match("Attack") or tool.Name:match("Right")) then
+				if not tool:GetAttribute("ActivatedOverride") then
+					tool:SetAttribute("ActivatedOverride", true)
+
+					_G.ToolConnections = _G.ToolConnections or {}
+					_G.ToolConnections[tool] = tool.Activated:Connect(function()
+						task.wait(0.05)
+						local char = Services.Players.LocalPlayer.Character
+						if char and char:FindFirstChild("Humanoid") then
+							for _, track in pairs(char.Humanoid:GetPlayingAnimationTracks()) do
+								if track.Animation then
+									local animId = track.Animation.AnimationId
+									local animName = track.Name:lower()
+
+									if
+										blockedAnimations[animId]
+										or animName:match("punch")
+										or animName:match("attack")
+										or animName:match("right")
+									then
+										track:Stop()
+									end
+								end
+							end
+						end
+					end)
+				end
+			end
+		end
+
+		local function overrideToolActivation()
+			for _, tool in pairs(Services.Players.LocalPlayer.Backpack:GetChildren()) do
+				processTool(tool)
+			end
+
+			local char = Services.Players.LocalPlayer.Character
+			if char then
+				for _, tool in pairs(char:GetChildren()) do
+					if tool:IsA("Tool") then
+						processTool(tool)
+					end
+				end
+			end
+
+			_G.BackpackAddedConnection = Services.Players.LocalPlayer.Backpack.ChildAdded:Connect(function(child)
+				if child:IsA("Tool") then
+					task.wait(0.1)
+					processTool(child)
+				end
+			end)
+
+			if char then
+				_G.CharacterToolAddedConnection = char.ChildAdded:Connect(function(child)
+					if child:IsA("Tool") then
+						task.wait(0.1)
+						processTool(child)
+					end
+				end)
+			end
+		end
+
+		_G.AnimMonitorConnection = Services.RunService.Heartbeat:Connect(function()
+			if tick() % 0.5 < 0.01 then
+				local char = Services.Players.LocalPlayer.Character
+				if char and char:FindFirstChild("Humanoid") then
+					for _, track in pairs(char.Humanoid:GetPlayingAnimationTracks()) do
+						if track.Animation then
+							local animId = track.Animation.AnimationId
+							local animName = track.Name:lower()
+
+							if
+								blockedAnimations[animId]
+								or animName:match("punch")
+								or animName:match("attack")
+								or animName:match("right")
+							then
+								track:Stop()
+							end
+						end
+					end
+				end
+			end
+		end)
+
+		_G.CharacterAddedConnection = Services.Players.LocalPlayer.CharacterAdded:Connect(function(newChar)
+			task.wait(1)
+			setupAnimationBlocking()
+			overrideToolActivation()
+
+			if _G.CharacterToolAddedConnection then
+				_G.CharacterToolAddedConnection:Disconnect()
+			end
+
+			_G.CharacterToolAddedConnection = newChar.ChildAdded:Connect(function(child)
+				if child:IsA("Tool") then
+					task.wait(0.1)
+					processTool(child)
+				end
+			end)
+		end)
+
+		setupAnimationBlocking()
+		overrideToolActivation()
+	else
+		if _G.AnimBlockConnection then
+			_G.AnimBlockConnection:Disconnect()
+			_G.AnimBlockConnection = nil
+		end
+
+		if _G.AnimMonitorConnection then
+			_G.AnimMonitorConnection:Disconnect()
+			_G.AnimMonitorConnection = nil
+		end
+
+		if _G.CharacterAddedConnection then
+			_G.CharacterAddedConnection:Disconnect()
+			_G.CharacterAddedConnection = nil
+		end
+
+		if _G.BackpackAddedConnection then
+			_G.BackpackAddedConnection:Disconnect()
+			_G.BackpackAddedConnection = nil
+		end
+
+		if _G.CharacterToolAddedConnection then
+			_G.CharacterToolAddedConnection:Disconnect()
+			_G.CharacterToolAddedConnection = nil
+		end
+
+		if _G.ToolConnections then
+			for tool, connection in pairs(_G.ToolConnections) do
+				if connection then
+					connection:Disconnect()
+				end
+				if tool and tool:GetAttribute("ActivatedOverride") then
+					tool:SetAttribute("ActivatedOverride", nil)
+				end
+			end
+			_G.ToolConnections = nil
+		end
+	end
+end)
+
+local NanData = {Enabled = false}
+
+killing:AddSwitch("NaN + Egg", function(bool)
+	NanData.Enabled = bool
+	if bool then
+		Remotes.ChangeSpeedSize:InvokeServer("changeSize", 0 / 0)
+		task.spawn(function()
+			while NanData.Enabled do
+				if PlayerData.Player.Character then
+					local eggsInHand = 0
+					for _, item in ipairs(PlayerData.Player.Character:GetChildren()) do
+						if item.Name == "Protein Egg" then
+							eggsInHand = eggsInHand + 1
+							if eggsInHand > 1 then item.Parent = PlayerData.Player.Backpack end
+						end
+					end
+					if eggsInHand == 0 and PlayerData.Player.Backpack:FindFirstChild("Protein Egg") then
+						PlayerData.Player.Backpack["Protein Egg"].Parent = PlayerData.Player.Character
+					end
+				end
+				task.wait(0.2)
+			end
+		end)
+	end
+end)
+
+local DisableEggState = {
+	enabled = false,
+	connections = {}
+}
+
+local function noEgg(tool)
+	for _, desc in ipairs(tool:GetDescendants()) do
+		if desc:IsA("Script") or desc:IsA("LocalScript") then
+			if desc:IsA("LocalScript") then desc.Disabled = true else desc:Destroy() end
+		end
+		if desc:IsA("RemoteEvent") then pcall(function() desc.FireServer = function() end end) end
+	end
+end
+
+local function setupEggDisable()
+	for _, container in ipairs({PlayerData.Player.Backpack, PlayerData.Player.Character}) do
+		if container then
+			for _, tool in ipairs(container:GetChildren()) do
+				if tool:IsA("Tool") and tool.Name == "Protein Egg" then noEgg(tool) end
+			end
+			local conn = container.ChildAdded:Connect(function(child)
+				if DisableEggState.enabled and child:IsA("Tool") and child.Name == "Protein Egg" then 
+					task.defer(noEgg, child) 
+				end
+			end)
+			table.insert(DisableEggState.connections, conn)
+		end
+	end
+end
+
+local function cleanupEggDisable()
+	for _, conn in ipairs(DisableEggState.connections) do
+		conn:Disconnect()
+	end
+	DisableEggState.connections = {}
+end
+
+local DisableEggSwitch = killing:AddSwitch("Disable Eating Eggs", function(bool)
+	DisableEggState.enabled = bool
+	if bool then
+		setupEggDisable()
+	else
+		cleanupEggDisable()
+	end
+end)
+
+PlayerData.Player.CharacterAdded:Connect(function(character)
+	if DisableEggState.enabled then
+		cleanupEggDisable()
+		task.wait(0.5)
+		setupEggDisable()
+	end
+end)
+
+killing:AddLabel("Auto Kill:")
+
+_G.whitelistedPlayers = _G.whitelistedPlayers or {}
+_G.blacklistedPlayers = _G.blacklistedPlayers or {}
+
+local function isWhitelisted(player)
+	for _, name in ipairs(_G.whitelistedPlayers) do
+		if name:lower() == player.Name:lower() then return true end
+	end
+	return false
+end
+
+local function isBlacklisted(player)
+	for _, name in ipairs(_G.blacklistedPlayers) do
+		if name:lower() == player.Name:lower() then return true end
+	end
+	return false
+end
+
+local whitelistDropdown = killing:AddDropdown("Add to Whitelist", function(selectedText)
+	local playerName = selectedText:match("| (.+)$")
+	if playerName then
+		playerName = playerName:gsub("^%s*(.-)%s*$", "%1")
+		for _, name in ipairs(_G.whitelistedPlayers) do
+			if name:lower() == playerName:lower() then return end
+		end
+		table.insert(_G.whitelistedPlayers, playerName)
+	end
+end)
+
+killing:AddSwitch("Auto Kill All", function(bool)
+	_G.killAll = bool
+	if bool then
+		if not _G.killAllConnection then
+			_G.killAllConnection = Services.RunService.Heartbeat:Connect(function()
+				if _G.killAll then
+					for _, player in ipairs(Services.Players:GetPlayers()) do
+						if player ~= Services.Players.LocalPlayer and not isWhitelisted(player) then killPlayer(player) end
+					end
+				end
+			end)
+		end
+	else
+		if _G.killAllConnection then _G.killAllConnection:Disconnect() _G.killAllConnection = nil end
+	end
+end)
+
+killing:AddSwitch("Whitelist Friends", function(bool)
+	_G.whitelistFriends = bool
+	
+	if bool then
+		for _, player in pairs(Services.Players:GetPlayers()) do
+			if player ~= Services.Players.LocalPlayer and player:IsFriendsWith(Services.Players.LocalPlayer.UserId) then
+				if not isWhitelisted(player) then 
+					table.insert(_G.whitelistedPlayers, player.Name) 
+				end
+			end
+		end
+		
+		_G.friendWhitelistConnection = Services.Players.PlayerAdded:Connect(function(player)
+			if _G.whitelistFriends and player:IsFriendsWith(Services.Players.LocalPlayer.UserId) then
+				if not isWhitelisted(player) then
+					table.insert(_G.whitelistedPlayers, player.Name)
+				end
+			end
+		end)
+		
+		_G.friendCheckLoop = task.spawn(function()
+			while _G.whitelistFriends do
+				task.wait(3)
+				for _, player in pairs(Services.Players:GetPlayers()) do
+					if player ~= Services.Players.LocalPlayer and player:IsFriendsWith(Services.Players.LocalPlayer.UserId) then
+						if not isWhitelisted(player) then
+							table.insert(_G.whitelistedPlayers, player.Name)
+							print("Neuer Freund zur Whitelist hinzugefÃ¼gt:", player.Name)
+						end
+					end
+				end
+			end
+		end)
+	else
+		if _G.friendWhitelistConnection then
+			_G.friendWhitelistConnection:Disconnect()
+			_G.friendWhitelistConnection = nil
+		end
+		if _G.friendCheckLoop then
+			task.cancel(_G.friendCheckLoop)
+			_G.friendCheckLoop = nil
+		end
+	end
+end)
+
+killing:AddLabel("Target Killing:")
+
+local blacklistDropdown = killing:AddDropdown("Add to Killlist", function(selectedText)
+	local playerName = selectedText:match("| (.+)$")
+	if playerName then
+		playerName = playerName:gsub("^%s*(.-)%s*$", "%1")
+		if not isBlacklisted({Name = playerName}) then table.insert(_G.blacklistedPlayers, playerName) end
+	end
+end)
+
+for _, player in ipairs(Services.Players:GetPlayers()) do
+	if player ~= Services.Players.LocalPlayer then
+		whitelistDropdown:Add(player.DisplayName .. " | " .. player.Name)
+		blacklistDropdown:Add(player.DisplayName .. " | " .. player.Name)
+	end
+end
+
+Services.Players.PlayerAdded:Connect(function(player)
+	if player ~= Services.Players.LocalPlayer then
+		whitelistDropdown:Add(player.DisplayName .. " | " .. player.Name)
+		blacklistDropdown:Add(player.DisplayName .. " | " .. player.Name)
+	end
+end)
+
+killing:AddSwitch("Kill List", function(bool)
+	_G.killBlacklistedOnly = bool
+	if bool then
+		if not _G.blacklistKillConnection then
+			_G.blacklistKillConnection = Services.RunService.Heartbeat:Connect(function()
+				if _G.killBlacklistedOnly then
+					for _, player in ipairs(Services.Players:GetPlayers()) do
+						if player ~= Services.Players.LocalPlayer and isBlacklisted(player) then killPlayer(player) end
+					end
+				end
+			end)
+		end
+	else
+		if _G.blacklistKillConnection then _G.blacklistKillConnection:Disconnect() _G.blacklistKillConnection = nil end
+	end
+end)
+
+local SpectateData = {
+	SelectedPlayer = nil,
+	SelectedPlayerUserId = nil,
+	Spectating = false,
+	CurrentTargetConnection = nil,
+	LocalPlayerRespawnConnection = nil,
+	CameraMonitorLoop = nil
+}
+
+getgenv().SpectateState = getgenv().SpectateState or {
+	SavedUserId = nil,
+	IsSpectating = false
+}
+
+local function stopSpectating()
+	if SpectateData.CurrentTargetConnection then
+		SpectateData.CurrentTargetConnection:Disconnect()
+		SpectateData.CurrentTargetConnection = nil
+	end
+	
+	if SpectateData.CameraMonitorLoop then
+		SpectateData.CameraMonitorLoop = false
+	end
+
+	local localPlayer = Services.Players.LocalPlayer
+	if localPlayer.Character then
+		local humanoid = localPlayer.Character:FindFirstChildOfClass("Humanoid")
+		if humanoid then
+			PlayerData.Camera.CameraSubject = humanoid
+			PlayerData.Camera.CameraType = Enum.CameraType.Custom
+		end
+	end
+	
+	if PlayerData.Humanoid then
+		PlayerData.Camera.CameraSubject = PlayerData.Humanoid
+	end
+end
+
+local function startCameraMonitor()
+	if SpectateData.CameraMonitorLoop then
+		SpectateData.CameraMonitorLoop = false
+		task.wait(0.3)
+	end
+	
+	SpectateData.CameraMonitorLoop = true
+	
+	task.spawn(function()
+		while SpectateData.CameraMonitorLoop do
+			task.wait(0.2)
+			if SpectateData.Spectating and SpectateData.SelectedPlayer then
+				local targetChar = SpectateData.SelectedPlayer.Character
+				if targetChar then
+					local targetHumanoid = targetChar:FindFirstChildOfClass("Humanoid")
+					if targetHumanoid then
+						if PlayerData.Camera.CameraSubject ~= targetHumanoid then
+							PlayerData.Camera.CameraSubject = targetHumanoid
+						end
+					end
+				end
+			else
+				break
 			end
 		end
 	end)
 end
+
+local function updateSpectateTarget(player)
+	if not player then
+		if SpectateData.SelectedPlayerUserId then
+			for _, p in ipairs(Services.Players:GetPlayers()) do
+				if p.UserId == SpectateData.SelectedPlayerUserId then
+					player = p
+					SpectateData.SelectedPlayer = player
+					break
+				end
+			end
+		end
+		
+		if not player and getgenv().SpectateState.SavedUserId then
+			for _, p in ipairs(Services.Players:GetPlayers()) do
+				if p.UserId == getgenv().SpectateState.SavedUserId then
+					player = p
+					SpectateData.SelectedPlayer = player
+					SpectateData.SelectedPlayerUserId = p.UserId
+					break
+				end
+			end
+		end
+		
+		if not player then
+			stopSpectating()
+			return
+		end
+	end
+
+	SpectateData.SelectedPlayerUserId = player.UserId
+	SpectateData.SelectedPlayer = player
+
+	if SpectateData.CurrentTargetConnection then
+		SpectateData.CurrentTargetConnection:Disconnect()
+		SpectateData.CurrentTargetConnection = nil
+	end
+
+	local function setCamera(char)
+		if not SpectateData.Spectating or SpectateData.SelectedPlayerUserId ~= player.UserId then
+			return
+		end
+		local humanoid = char:WaitForChild("Humanoid", 3)
+		if humanoid and SpectateData.Spectating and SpectateData.SelectedPlayerUserId == player.UserId then
+			PlayerData.Camera.CameraSubject = humanoid
+		end
+	end
+	
+	if player.Character then
+		setCamera(player.Character)
+	end
+	
+	SpectateData.CurrentTargetConnection = player.CharacterAdded:Connect(function(newChar)
+		if SpectateData.Spectating and SpectateData.SelectedPlayerUserId == player.UserId then
+			setCamera(newChar)
+		end
+	end)
+end
+
+local function updatePlayerList()
+	return Services.Players:GetPlayers()
+end
+
+local specsdropdown = killing:AddDropdown("Choose Player", function(text)
+	for _, player in ipairs(updatePlayerList()) do
+		local optionText = player.DisplayName .. " | " .. player.Name
+		if text == optionText then
+			SpectateData.SelectedPlayer = player
+			SpectateData.SelectedPlayerUserId = player.UserId
+			getgenv().SpectateState.SavedUserId = player.UserId
+			if SpectateData.Spectating then
+				updateSpectateTarget(player)
+			end
+			break
+		end
+	end
+end)
+
+killing:AddSwitch("Spectate", function(bool)
+	SpectateData.Spectating = bool
+	getgenv().SpectateState.IsSpectating = bool
+
+	if SpectateData.Spectating then
+		if SpectateData.SelectedPlayerUserId then
+			getgenv().SpectateState.SavedUserId = SpectateData.SelectedPlayerUserId
+		end
+		updateSpectateTarget()
+		startCameraMonitor()
+	else
+		stopSpectating()
+		task.wait(0.1)
+		local localPlayer = Services.Players.LocalPlayer
+		if localPlayer.Character then
+			local humanoid = localPlayer.Character:FindFirstChildOfClass("Humanoid")
+			if humanoid then
+				PlayerData.Camera.CameraSubject = humanoid
+			end
+		end
+		getgenv().SpectateState.IsSpectating = false
+	end
+end)
+
+for _, player in ipairs(updatePlayerList()) do
+	specsdropdown:Add(player.DisplayName .. " | " .. player.Name)
+end
+
+Services.Players.PlayerAdded:Connect(function(player)
+	specsdropdown:Add(player.DisplayName .. " | " .. player.Name)
+	if getgenv().SpectateState.IsSpectating and getgenv().SpectateState.SavedUserId == player.UserId then
+		SpectateData.Spectating = true
+		SpectateData.SelectedPlayer = player
+		SpectateData.SelectedPlayerUserId = player.UserId
+		updateSpectateTarget(player)
+	end
+end)
+
+Services.Players.PlayerRemoving:Connect(function(player)
+	if player.UserId == SpectateData.SelectedPlayerUserId then
+		if SpectateData.Spectating then
+			stopSpectating()
+
+			SpectateData.SelectedPlayer = nil
+			SpectateData.CurrentTargetConnection = nil
+			
+			local localPlayer = Services.Players.LocalPlayer
+			if localPlayer.Character and PlayerData.Humanoid then
+				PlayerData.Camera.CameraSubject = PlayerData.Humanoid
+			end
+		end
+	end
+end)
+
+if SpectateData.LocalPlayerRespawnConnection then
+	SpectateData.LocalPlayerRespawnConnection:Disconnect()
+end
+
+SpectateData.LocalPlayerRespawnConnection = Services.Players.LocalPlayer.CharacterAdded:Connect(function(char)
+	local humanoid = char:WaitForChild("Humanoid", 3)
+	if humanoid then
+		PlayerData.Humanoid = humanoid
+	end
+	
+	task.wait(0.5)
+	
+	if getgenv().SpectateState.IsSpectating then
+		SpectateData.Spectating = true
+		updateSpectateTarget()
+		startCameraMonitor()
+	else
+		if PlayerData.Humanoid then
+			PlayerData.Camera.CameraSubject = PlayerData.Humanoid
+		end
+	end
+end)
+
+killing:AddLabel("â­• Kill Aura:")
+
+local KillAura = {RingPart = nil, RingColor = Color3.fromRGB(50, 163, 255), RingTransparency = 0.6}
+_G.showDeathRing = false
+_G.deathRingRange = 20
+
+killing:AddTextBox("Range (1-140):", function(text)
+	if tonumber(text) then
+		_G.deathRingRange = math.clamp(tonumber(text), 1, 140)
+		if KillAura.RingPart then
+			KillAura.RingPart.Size = Vector3.new(0.2, _G.deathRingRange * 2, _G.deathRingRange * 2)
+		end
+	end
+end)
+
+killing:AddSwitch("Show Ring", function(bool)
+	_G.showDeathRing = bool
+	if bool then
+		KillAura.RingPart = Instance.new("Part")
+		KillAura.RingPart.Shape = Enum.PartType.Cylinder
+		KillAura.RingPart.Material = Enum.Material.Neon
+		KillAura.RingPart.Color = KillAura.RingColor
+		KillAura.RingPart.Transparency = KillAura.RingTransparency
+		KillAura.RingPart.Anchored = true
+		KillAura.RingPart.CanCollide = false
+		KillAura.RingPart.CastShadow = false
+		KillAura.RingPart.Size = Vector3.new(0.2, _G.deathRingRange * 2, _G.deathRingRange * 2)
+		KillAura.RingPart.Parent = Services.Workspace
+	elseif KillAura.RingPart then
+		KillAura.RingPart:Destroy()
+		KillAura.RingPart = nil
+	end
+end)
+
+killing:AddSwitch("Toggle Ring", function(bool)
+	_G.deathRingEnabled = bool
+	if bool then
+		if not _G.deathRingConnection then
+			_G.deathRingConnection = Services.RunService.Heartbeat:Connect(function()
+				if KillAura.RingPart and checkCharacter():FindFirstChild("HumanoidRootPart") then
+					KillAura.RingPart.CFrame = checkCharacter().HumanoidRootPart.CFrame * CFrame.Angles(0, 0, math.rad(90))
+				end
+				if checkCharacter():FindFirstChild("HumanoidRootPart") then
+					for _, player in ipairs(Services.Players:GetPlayers()) do
+						if player ~= Services.Players.LocalPlayer and not isWhitelisted(player) and isPlayerAlive(player) then
+							if (checkCharacter().HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude <= _G.deathRingRange then
+								killPlayer(player)
+							end
+						end
+					end
+				end
+			end)
+		end
+	else
+		if _G.deathRingConnection then _G.deathRingConnection:Disconnect() _G.deathRingConnection = nil end
+	end
+end)
+
+local whitelistLabel = Tabs.Killing:AddLabel("Whitelist: None")
+whitelistLabel.TextSize = 14
+killing:AddButton("Clear Whitelist", function() _G.whitelistedPlayers = {} end)
+
+local blacklistLabel = killing:AddLabel("Killlist: None")
+blacklistLabel.TextSize = 14
+killing:AddButton("Clear Killlist", function() _G.blacklistedPlayers = {} end)
+
+task.spawn(function()
+	while true do
+		whitelistLabel.Text = #_G.whitelistedPlayers == 0 and "Whitelist: None" or "Whitelist: " .. table.concat(_G.whitelistedPlayers, ", ")
+		blacklistLabel.Text = #_G.blacklistedPlayers == 0 and "Killlist: None" or "Killlist: " .. table.concat(_G.blacklistedPlayers, ", ")
+		task.wait(0.01)
+	end
+end)
